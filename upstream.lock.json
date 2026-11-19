@@ -7,5 +7,8 @@
   "foundation4d_paper": "https://arxiv.org/abs/2610.30340",
   "foundation4d_pdf_sha256": "dd7efdaeafb997f2257e401c64e002ce5cc3bd674a1060f82c10d069f89a8602",
   "fork": "https://github.com/zixunh/DVGT-F4",
-  "dinov3_commit": "6876159a11b4df116f30f667f8c9888617df0751"
+  "dinov3_commit": "6876159a11b4df116f30f667f8c9888617df0751",
+  "checkpoint_revision": "48fcdf265aa3bfbe1d613f7b656719e744279b5e",
+  "checkpoint_sha256": "a1dafdfbe022824f36fe379531d24b50398509375c06fef2aafb0008b0744af6",
+  "checkpoint_bytes": 6840965134
 }

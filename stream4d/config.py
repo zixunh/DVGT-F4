@@ -28,11 +28,15 @@ class HeadConfig:
     detection_queries: int = 64
     detection_layers: int = 3
     samples: int = 4
-    detection_bounds: list = field(default_factory=lambda: [-30., -20., -3., 80., 20., 5.])
+    detection_bounds: list = field(
+        default_factory=lambda: [-30.0, -20.0, -3.0, 80.0, 20.0, 5.0]
+    )
     occupancy_classes: int = 16
     occupancy_shape: list = field(default_factory=lambda: [80, 40, 12])
     occupancy_coarse: list = field(default_factory=lambda: [10, 5])
-    occupancy_bounds: list = field(default_factory=lambda: [-20., -20., -3., 60., 20., 3.])
+    occupancy_bounds: list = field(
+        default_factory=lambda: [-20.0, -20.0, -3.0, 60.0, 20.0, 3.0]
+    )
     occupancy_layers: int = 2
     gaussian_stride: int = 4
     sky_resolution: int = 8
@@ -71,21 +75,50 @@ class Config:
             raise ValueError("backend must be dvgt2/tiny and window must be in [1, 23]")
         if b.metric_scale <= 0 or b.patch_size < 1 or b.finetune_last_blocks < 0:
             raise ValueError("Invalid backbone scale, patch size, or finetuning count")
-        if h.channels % h.attention_heads or min(h.channels, h.attention_heads) <= 0:
+        if min(h.channels, h.attention_heads) <= 0 or h.channels % h.attention_heads:
             raise ValueError("channels must be divisible by attention_heads")
         for bounds in (h.detection_bounds, h.occupancy_bounds):
-            if len(bounds) != 6 or any(bounds[i] >= bounds[i+3] for i in range(3)):
+            if len(bounds) != 6 or any(bounds[i] >= bounds[i + 3] for i in range(3)):
                 raise ValueError("Bounds must be [xmin,ymin,zmin,xmax,ymax,zmax]")
         if len(h.occupancy_shape) != 3 or len(h.occupancy_coarse) != 2:
             raise ValueError("occupancy_shape is XYZ; occupancy_coarse is XY")
-        if min(*h.occupancy_shape, *h.occupancy_coarse, h.gaussian_stride, h.sky_resolution,
-               h.detection_queries, h.detection_layers, h.occupancy_layers) <= 0:
+        if (
+            min(
+                *h.occupancy_shape,
+                *h.occupancy_coarse,
+                h.gaussian_stride,
+                h.sky_resolution,
+                h.detection_queries,
+                h.detection_layers,
+                h.occupancy_layers,
+            )
+            <= 0
+        ):
             raise ValueError("Head dimensions must be positive")
-        if not -1 <= h.sky_class < h.semantic_classes or any(x < 0 or x >= h.semantic_classes for x in h.dynamic_classes):
+        if not -1 <= h.sky_class < h.semantic_classes or any(
+            x < 0 or x >= h.semantic_classes for x in h.dynamic_classes
+        ):
             raise ValueError("Semantic class mapping out of range")
-        if min(s.static_gaussians, s.actor_gaussians, s.gaussian_per_frame, s.track_max_count) < 1:
+        if (
+            min(
+                s.static_gaussians,
+                s.actor_gaussians,
+                s.gaussian_per_frame,
+                s.track_max_count,
+            )
+            < 1
+        ):
             raise ValueError("State budgets must be positive")
-        if min(s.voxel_size, s.map_radius, s.track_max_age_seconds, s.association_distance, s.max_gap_seconds) <= 0:
+        if (
+            min(
+                s.voxel_size,
+                s.map_radius,
+                s.track_max_age_seconds,
+                s.association_distance,
+                s.max_gap_seconds,
+            )
+            <= 0
+        ):
             raise ValueError("Spatial and temporal limits must be positive")
         if self.renderer not in ("reference", "gsplat"):
             raise ValueError("renderer must be reference or gsplat")
@@ -99,8 +132,12 @@ def from_dict(raw):
     raw = dict(raw)
     allowed = {f.name for f in fields(Config)}
     if set(raw) - allowed:
-        raise ValueError(f"Unknown config keys: {sorted(set(raw)-allowed)}")
-    for name, cls in (("backend", BackendConfig), ("heads", HeadConfig), ("stream", StreamConfig)):
+        raise ValueError(f"Unknown config keys: {sorted(set(raw) - allowed)}")
+    for name, cls in (
+        ("backend", BackendConfig),
+        ("heads", HeadConfig),
+        ("stream", StreamConfig),
+    ):
         raw[name] = cls(**raw.get(name, {}))
     return Config(**raw).validate()
 

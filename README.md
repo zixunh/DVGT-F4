@@ -1,3 +1,5 @@
+> **DVGT-F4 streaming baseline:** 多任务在线感知、跟踪与动态 Gaussian 扩展见 [README_F4.md](README_F4.md)，运行入口为 `run_f4.sh`。
+
 # DVGT: Driving Visual Geometry Transformer
 **DVGT** is a comprehensive autonomous driving framework that leverages dense 3D geometry as the foundation for perception and planning. This repository hosts the official implementation of the DVGT series: from reconstructing metric-scaled dense point maps across diverse datasets (**DVGT-1**) to introducing an efficient Vision-Geometry-Action (VGA) paradigm for online joint reconstruction and planning (**DVGT-2**). 
 

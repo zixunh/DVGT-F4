@@ -1,0 +1,353 @@
+{
+  "status": "experimental_streaming_baseline_with_verified_official_dvgt2_geometry",
+  "checked_at_utc": "2026-11-19T19:19:42.444963+00:00",
+  "fork": "https://github.com/zixunh/DVGT-F4",
+  "branch": "feat/streaming-foundation4d",
+  "upstream": {
+    "repository": "https://github.com/wzzheng/DVGT.git",
+    "commit": "51cf3f6d11fdff8bc7e2bbe1a88f71665ccb2236",
+    "checkpoint_repo": "RainyNight/DVGT-2",
+    "checkpoint_file": "dvgt2.pt",
+    "dvgt2_paper": "https://arxiv.org/abs/2604.00813",
+    "foundation4d_paper": "https://arxiv.org/abs/2610.30340",
+    "foundation4d_pdf_sha256": "dd7efdaeafb997f2257e401c64e002ce5cc3bd674a1060f82c10d069f89a8602",
+    "fork": "https://github.com/zixunh/DVGT-F4",
+    "dinov3_commit": "6876159a11b4df116f30f667f8c9888617df0751",
+    "checkpoint_revision": "48fcdf265aa3bfbe1d613f7b656719e744279b5e",
+    "checkpoint_sha256": "a1dafdfbe022824f36fe379531d24b50398509375c06fef2aafb0008b0744af6",
+    "checkpoint_bytes": 6840965134
+  },
+  "hardware": "NVIDIA GeForce RTX 4090 24GB",
+  "coordinate_contract": {
+    "ego_world": "FLU, meters",
+    "camera": "OpenCV RDF, rectified pinhole",
+    "quaternion": "wxyz",
+    "depth": "camera z-depth; rendered range is camera radial distance",
+    "relative_pose": "previous ego to current ego; world pose accumulates the inverse"
+  },
+  "implemented": [
+    "strict official checkpoint load including original pose and point heads",
+    "persistent bounded per-stream KV and ego-token cache",
+    "four-layer feature pyramid and semantic head",
+    "projected multi-camera 3D detection with velocity",
+    "local binary/semantic occupancy and auxiliary BEV supervision",
+    "causal class-gated Kalman/Hungarian tracker",
+    "actor-local and static-world Gaussian maps with count, radius and lifetime budgets",
+    "independent Gaussian depth residual, attributes, sky cubemap and camera affine",
+    "held-out-view differentiable static/dynamic reconstruction; optional LPIPS and normal supervision",
+    "reference and CUDA gsplat backends with matched pixel-center convention",
+    "lazy per-frame JSONL input and per-frame output writing",
+    "perception, Gaussian warmup and joint training; adapter checkpoints",
+    "optional last-block fine-tuning with detached past state"
+  ],
+  "verification": {
+    "unit_tests": {
+      "passed": 18,
+      "command": ".venv/bin/python -m unittest discover -s tests/stream4d -v",
+      "long_stream_fixture_frames": 80
+    },
+    "official_checkpoint_sha256_verified": true,
+    "official_pretrained_stream_and_frozen_training": {
+      "official_load": {
+        "checkpoint": "checkpoints/dvgt2.pt",
+        "keys": 1951,
+        "parameters": 1709991782,
+        "missing_keys": [],
+        "unexpected_keys": []
+      },
+      "input_hw": [
+        64,
+        96
+      ],
+      "views": 2,
+      "frames": 12,
+      "elapsed_seconds": 1.2689135419204831,
+      "peak_cuda_mb": 6762.43701171875,
+      "state_samples": [
+        {
+          "frames": 1,
+          "backbone_bytes": 11132928,
+          "tracks": 0,
+          "static_gaussians": 14,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 2,
+          "backbone_bytes": 22265856,
+          "tracks": 0,
+          "static_gaussians": 26,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 3,
+          "backbone_bytes": 33398784,
+          "tracks": 0,
+          "static_gaussians": 38,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 4,
+          "backbone_bytes": 44531712,
+          "tracks": 0,
+          "static_gaussians": 53,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 5,
+          "backbone_bytes": 44531712,
+          "tracks": 0,
+          "static_gaussians": 67,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 6,
+          "backbone_bytes": 44531712,
+          "tracks": 0,
+          "static_gaussians": 82,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 7,
+          "backbone_bytes": 44531712,
+          "tracks": 0,
+          "static_gaussians": 100,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 8,
+          "backbone_bytes": 44531712,
+          "tracks": 0,
+          "static_gaussians": 120,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 9,
+          "backbone_bytes": 44531712,
+          "tracks": 0,
+          "static_gaussians": 131,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 10,
+          "backbone_bytes": 44531712,
+          "tracks": 0,
+          "static_gaussians": 147,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 11,
+          "backbone_bytes": 44531712,
+          "tracks": 0,
+          "static_gaussians": 182,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 12,
+          "backbone_bytes": 44531712,
+          "tracks": 0,
+          "static_gaussians": 197,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        }
+      ],
+      "synthetic_input": true,
+      "new_heads_random": true,
+      "frozen_backbone_training_step": {
+        "loss": 7.7163777351379395,
+        "head_updated": true,
+        "backbone_gradients": false
+      }
+    },
+    "last_block_finetuning": {
+      "official_load": {
+        "checkpoint": "checkpoints/dvgt2.pt",
+        "keys": 1951,
+        "parameters": 1709991782,
+        "missing_keys": [],
+        "unexpected_keys": []
+      },
+      "input_hw": [
+        64,
+        96
+      ],
+      "views": 2,
+      "frames": 5,
+      "elapsed_seconds": 0.8519480610266328,
+      "peak_cuda_mb": 6762.9599609375,
+      "state_samples": [
+        {
+          "frames": 1,
+          "backbone_bytes": 11132928,
+          "tracks": 0,
+          "static_gaussians": 14,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 2,
+          "backbone_bytes": 22265856,
+          "tracks": 0,
+          "static_gaussians": 26,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 3,
+          "backbone_bytes": 33398784,
+          "tracks": 0,
+          "static_gaussians": 38,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 4,
+          "backbone_bytes": 44531712,
+          "tracks": 0,
+          "static_gaussians": 53,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        {
+          "frames": 5,
+          "backbone_bytes": 44531712,
+          "tracks": 0,
+          "static_gaussians": 67,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        }
+      ],
+      "synthetic_input": true,
+      "new_heads_random": true,
+      "training_step": {
+        "loss": 7.7163777351379395,
+        "head_updated": true,
+        "finetune_blocks": 1,
+        "backbone_parameters_with_grad": 54,
+        "peak_cuda_mb_including_training": 7208.38427734375
+      }
+    },
+    "tiny_perception": {
+      "stage": "perception",
+      "steps": 30,
+      "first_loss": 3.3133509159088135,
+      "last_loss": 1.741637945175171,
+      "elapsed_seconds": 1.408832248300314,
+      "synthetic": true,
+      "trainable_parameters": 124833,
+      "pretrained_geometry": false,
+      "lpips": false
+    },
+    "tiny_gaussian": {
+      "stage": "gaussian",
+      "steps": 5,
+      "first_loss": 6.273719310760498,
+      "last_loss": 6.085296154022217,
+      "elapsed_seconds": 0.6559339258819818,
+      "synthetic": true,
+      "trainable_parameters": 13083,
+      "pretrained_geometry": false,
+      "lpips": false
+    },
+    "tiny_joint": {
+      "stage": "joint",
+      "steps": 8,
+      "first_loss": 8.122962951660156,
+      "last_loss": 6.947985649108887,
+      "elapsed_seconds": 0.8232905995100737,
+      "synthetic": true,
+      "trainable_parameters": 137916,
+      "pretrained_geometry": false,
+      "lpips": false
+    },
+    "smoke_script": {
+      "command": "bash tools/stream4d/smoke.sh",
+      "passed": true,
+      "inference": {
+        "frames": 12,
+        "elapsed_seconds": 0.6351529331877828,
+        "peak_backbone_state_bytes": 12288,
+        "last_state": {
+          "scene_id": "synthetic",
+          "timestamp": 5.5,
+          "pretrained_geometry": false,
+          "new_heads_trained": true,
+          "trained_stages": [
+            "joint",
+            "perception"
+          ],
+          "frames": 12,
+          "backbone_bytes": 12288,
+          "tracks": 0,
+          "static_gaussians": 183,
+          "actor_gaussians": 0,
+          "active_actor_maps": 0
+        },
+        "pretrained_geometry": false,
+        "trained_stages": [
+          "joint",
+          "perception"
+        ],
+        "synthetic_checkpoint": true,
+        "depth_mae_m": 8.989704767862955,
+        "peak_cuda_mb": 16.228515625
+      }
+    },
+    "cuda_reference_comparison": {
+      "cuda_forward_backward": true,
+      "reference_rgb_mean_abs_error": 3.427306728553958e-05,
+      "reference_camera_range_mean_abs_error": 0.0011655313428491354,
+      "primitive_count": 2,
+      "output_hw": [
+        32,
+        32
+      ]
+    },
+    "official_backbone_to_cuda_render": {
+      "frames": 5,
+      "elapsed_seconds": 1.2322404505684972,
+      "peak_backbone_state_bytes": 23298048,
+      "last_state": {
+        "scene_id": "synthetic",
+        "timestamp": 2.0,
+        "pretrained_geometry": true,
+        "new_heads_trained": false,
+        "trained_stages": [],
+        "frames": 5,
+        "backbone_bytes": 23298048,
+        "tracks": 0,
+        "static_gaussians": 208,
+        "actor_gaussians": 0,
+        "active_actor_maps": 0
+      },
+      "pretrained_geometry": true,
+      "trained_stages": [],
+      "synthetic_checkpoint": false,
+      "depth_mae_m": 16.91335703531901,
+      "peak_cuda_mb": 6689.9052734375
+    },
+    "editable_install_and_cli": true
+  },
+  "not_claimed": [
+    "Foundation4D paper-faithful architecture or published metric reproduction",
+    "real-data-trained semantic/detection/occupancy/Gaussian weights",
+    "Physical AI or Waymo native data adapter and official benchmark scores",
+    "native f-theta, rolling shutter or asynchronous motion compensation",
+    "full-video global PGO/loop closure or unlimited retained world map",
+    "offline two-pass tracking and RTS smoothing",
+    "joint retraining of original DVGT-2 diffusion pose/planning head",
+    "full-resolution six-camera real-time throughput on 24GB GPU",
+    "LPIPS-enabled optimization validated in this session"
+  ],
+  "training_data_notice": "All executed training and inference examples used labeled synthetic fixtures. Only the geometry backbone has official real-data pretrained weights."
+}

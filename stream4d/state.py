@@ -15,7 +15,7 @@ def detach_tree(value):
 
 def tensor_bytes(value):
     if isinstance(value, torch.Tensor):
-        return value.numel()*value.element_size()
+        return value.numel() * value.element_size()
     if isinstance(value, dict):
         return sum(tensor_bytes(v) for v in value.values())
     if isinstance(value, (list, tuple)):
@@ -31,8 +31,12 @@ class BackboneState:
     frame_index: int = 0
 
     def detached(self):
-        return BackboneState(detach_tree(self.kv), detach_tree(self.ego_tokens),
-                             detach_tree(self.tiny_history), self.frame_index)
+        return BackboneState(
+            detach_tree(self.kv),
+            detach_tree(self.ego_tokens),
+            detach_tree(self.tiny_history),
+            self.frame_index,
+        )
 
 
 @dataclass
@@ -45,6 +49,11 @@ class StreamState:
     signature: Any = None
 
     def statistics(self):
-        return {"frames": self.backbone.frame_index,
-                "backbone_bytes": tensor_bytes((self.backbone.kv, self.backbone.ego_tokens, self.backbone.tiny_history)),
-                "tracks": len(self.tracker.tracks), **self.gaussian_map.statistics()}
+        return {
+            "frames": self.backbone.frame_index,
+            "backbone_bytes": tensor_bytes(
+                (self.backbone.kv, self.backbone.ego_tokens, self.backbone.tiny_history)
+            ),
+            "tracks": len(self.tracker.tracks),
+            **self.gaussian_map.statistics(),
+        }
