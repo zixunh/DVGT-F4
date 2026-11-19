@@ -163,3 +163,11 @@ third_party/dinov3
 third_party/map-anything
 third_party/StreamVGGT
 third_party/dgp
+# DVGT-F4 local environments and generated artifacts
+.venv/
+checkpoints/
+outputs/
+data/
+*.egg-info/
+.pytest_cache/
+third_party/dinov3/

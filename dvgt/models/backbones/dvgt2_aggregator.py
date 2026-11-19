@@ -62,6 +62,7 @@ class DVGT2Aggregator(nn.Module):
         future_frame_window=8,
         max_frames= 48,
         use_causal_mask=False,
+        patch_embed_module: Optional[nn.Module] = None,
     ):
         super().__init__()
 
@@ -78,7 +79,9 @@ class DVGT2Aggregator(nn.Module):
             raise ValueError(f"depth ({depth}) must be divisible by aa_block_size ({aa_block_size})")
         self.aa_block_num = self.depth // self.aa_block_size
         
-        if dino_v3_weight_path:
+        if patch_embed_module is not None:
+            self.patch_embed = patch_embed_module
+        elif dino_v3_weight_path:
             self.patch_embed = torch.hub.load('third_party/dinov3', patch_embed, source='local', weights=dino_v3_weight_path)   # Load model code and weight
         else:
             self.patch_embed = torch.hub.load('third_party/dinov3', patch_embed, source='local')   # Only load model code

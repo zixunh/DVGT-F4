@@ -1,0 +1,30 @@
+backend:
+  name: tiny
+  window: 3
+  tiny_dim: 32
+  patch_size: 8
+heads:
+  channels: 24
+  attention_heads: 4
+  semantic_classes: 4
+  detection_classes: 2
+  detection_queries: 12
+  detection_layers: 2
+  samples: 2
+  detection_bounds: [0, -6, -3, 20, 6, 3]
+  occupancy_classes: 3
+  occupancy_shape: [12, 8, 4]
+  occupancy_coarse: [3, 2]
+  occupancy_bounds: [0, -6, -2, 18, 6, 2]
+  occupancy_layers: 1
+  gaussian_stride: 4
+  sky_resolution: 4
+  sky_class: 3
+  dynamic_classes: [2]
+stream:
+  static_gaussians: 256
+  actor_gaussians: 64
+  gaussian_per_frame: 128
+  track_max_count: 8
+  voxel_size: 0.3
+renderer: reference

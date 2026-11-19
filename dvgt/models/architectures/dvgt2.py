@@ -27,6 +27,7 @@ class DVGT2(nn.Module):
         future_frame_window: int = 8,
         relative_pose_window: int = 1,
         use_causal_mask: bool = True,
+        patch_embed_module: Optional[nn.Module] = None,
     ):
         super().__init__()
 
@@ -43,6 +44,7 @@ class DVGT2(nn.Module):
             patch_embed=patch_embed, dino_v3_weight_path=dino_v3_weight_path,
             use_causal_mask=use_causal_mask, relative_pose_window=self.relative_pose_window,
             future_frame_window=self.future_frame_window,
+            patch_embed_module=patch_embed_module,
         )
 
         self.ego_pose_head = instantiate(ego_pose_head_conf, dim_in=dim_in) if ego_pose_head_conf else None

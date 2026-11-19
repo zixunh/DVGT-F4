@@ -1,0 +1,20 @@
+# RGB multi-camera input; known rectified pinhole calibrations; metric FLU labels.
+# These task class IDs are placeholders. Set mappings for your training dataset.
+backend:
+  name: dvgt2
+  repository: .
+  checkpoint: checkpoints/dvgt2.pt
+  window: 4
+  metric_scale: 0.1
+  amp: true
+  finetune_last_blocks: 0
+heads:
+  channels: 64
+  semantic_classes: 21
+  detection_classes: 10
+  occupancy_classes: 16
+  occupancy_shape: [80, 40, 12]
+  occupancy_coarse: [10, 5]
+  sky_class: -1
+  dynamic_classes: []
+renderer: gsplat
