@@ -17,6 +17,7 @@ def download_ranges(
     workers=8,
     part_bytes=256 * 1024 * 1024,
     report=None,
+    prefix_file=None,
 ):
     import requests
 
@@ -32,6 +33,28 @@ def download_ranges(
         (n, start, min(size, start + part_bytes) - 1)
         for n, start in enumerate(range(0, size, part_bytes))
     ]
+
+    if prefix_file is not None:
+        prefix_file = Path(prefix_file)
+        available = min(size, prefix_file.stat().st_size)
+        with prefix_file.open("rb") as prefix:
+            for number, start, end in ranges:
+                wanted = max(0, min(end + 1, available) - start)
+                if not wanted:
+                    break
+                part = parts / f"{number:05d}.part"
+                present = part.stat().st_size if part.exists() else 0
+                if present >= wanted:
+                    continue
+                prefix.seek(start + present)
+                with part.open("ab") as output:
+                    remaining = wanted - present
+                    while remaining:
+                        block = prefix.read(min(8 * 1024 * 1024, remaining))
+                        if not block:
+                            raise RuntimeError("Existing download prefix is truncated.")
+                        output.write(block)
+                        remaining -= len(block)
 
     def transfer(item):
         number, start, end = item

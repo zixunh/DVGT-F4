@@ -246,19 +246,30 @@ def download_one(root, revision, entry, previous, range_workers=0):
             log("verified_file_reused", path=entry["path"])
             return old
     log("downloading", path=entry["path"], bytes=entry["bytes"])
-    ranged = range_workers > 0 and entry["bytes"] >= 8 * 1024**3
+    ranged = range_workers > 0 and entry["bytes"] >= 256 * 1024**2
     if ranged:
         from huggingface_hub import hf_hub_url
         from huggingface_hub.utils import build_hf_headers
         from pai_http_range import download_ranges
 
+        cache = root / ".cache/huggingface/download" / Path(entry["path"]).parent
+        prefixes = [
+            p
+            for p in cache.glob(f"*.{entry['sha256']}.*.incomplete")
+            if p.stat().st_size <= entry["bytes"]
+            and p.stat().st_blocks * 512 >= p.stat().st_size
+        ]
+        prefix = max(prefixes, key=lambda p: p.stat().st_size, default=None)
         filename = download_ranges(
             hf_hub_url(REPO, entry["path"], repo_type="dataset", revision=revision),
             build_hf_headers(),
             root / entry["path"],
             entry["bytes"],
             entry["sha256"],
-            workers=range_workers,
+            workers=range_workers
+            if entry["bytes"] >= 8 * 1024**3
+            else min(range_workers, 4),
+            prefix_file=prefix,
             report=lambda done, total: log(
                 "range_progress",
                 path=entry["path"],
@@ -324,7 +335,7 @@ def main():
         "--range-workers",
         type=int,
         default=0,
-        help="Parallel HTTP ranges for files >=8 GiB; 0 uses the Hub transport.",
+        help="Parallel HTTP ranges for files >=256 MiB; 0 uses the Hub transport.",
     )
     args = parser.parse_args()
     if (
@@ -394,13 +405,8 @@ def main():
         for entry in plan["files"]
     )
     range_reserve = (
-        max(
-            (
-                entry["bytes"]
-                for entry in plan["files"]
-                if entry["bytes"] >= 8 * 1024**3
-            ),
-            default=0,
+        sum(
+            entry["bytes"] for entry in plan["files"] if entry["bytes"] >= 256 * 1024**2
         )
         if args.range_workers
         else 0

@@ -75,6 +75,27 @@ class RangeTransportTests(unittest.TestCase):
             self.assertIn((1000, 4095), self.requests)
             self.assertFalse(parts.exists())
 
+    def test_imports_existing_hub_prefix_without_redownloading_it(self):
+        digest = hashlib.sha256(self.payload).hexdigest()
+        with TemporaryDirectory() as directory:
+            target = Path(directory) / "sample.zip"
+            prefix = Path(directory) / "old.incomplete"
+            prefix.write_bytes(self.payload[:6500])
+            self.requests.clear()
+            transport.download_ranges(
+                self.url,
+                {},
+                target,
+                len(self.payload),
+                digest,
+                workers=3,
+                part_bytes=4096,
+                prefix_file=prefix,
+            )
+            self.assertEqual(target.read_bytes(), self.payload)
+            self.assertIn((6500, 8191), self.requests)
+            self.assertFalse(any(start < 6500 for start, end in self.requests))
+
     def test_server_ignoring_range_is_rejected(self):
         with TemporaryDirectory() as directory:
             target = Path(directory) / "sample.zip"

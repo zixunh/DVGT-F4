@@ -33,4 +33,6 @@ HF_HUB_DISABLE_XET=1 .venv/bin/python tools/data_process/download_pai_mini.py \
 
 受限仓库在登录前可能以星号隐藏 LFS 哈希，脚本会在授权通过后重新获取固定版本的真实校验值。每个下载文件检查字节数并计算 SHA256；上游提供 LFS SHA256 时进行比对。只有所有文件通过检查，计划状态才写为 `complete`。网络失败后重新执行相同命令即可续传；不要把计划文件存在等同于数据下载完成。
 
-对于本机上无进度的 Xet 大文件传输，示例使用 `HF_HUB_DISABLE_XET=1` 走 Hub HTTP 续传。`--range-workers 8` 对至少 8 GiB 的文件使用 256 MiB 分段、8 路 HTTP Range 下载，记录各段进度并在合并时核验完整 SHA256。服务端必须返回正确的 206/Content-Range，否则拒绝写入；磁盘预算包含临时分段及合并所需空间。视频等较小文件仍走 Hub 标准续传。
+对于本机上无进度的 Xet 大文件传输，示例使用 `HF_HUB_DISABLE_XET=1` 走 Hub HTTP 续传。`--range-workers 8` 对至少 256 MiB 的文件使用 256 MiB 固定分段；至少 8 GiB 的大文件采用指定并发，视频每个文件最多 4 路。已有 Hub 临时文件按可信文件哈希匹配，导入其最长非稀疏下载前缀，避免 Hub 生成新临时文件时重复下载。各段可恢复，并在合并时核验完整 SHA256。服务端必须返回正确的 206/Content-Range，否则拒绝写入；磁盘预算包含所有临时分段及合并所需空间。更小的文件仍走 Hub 下载。
+
+本次远程下载在 `zixun-compute` 的独立 tmux 会话 `pai-mini` 运行，输出目录中的 `run_download.sh` 负责启动任务并写入 `download.exitcode`。断开本地 SSH 不影响该会话；远程服务器需要保持开机联网。完成以 `download_plan.json` 的 `status: complete` 和退出码 0 为准。查看日志：`tail -f /mnt/raid/dataset/PAI/mini/download.log`。
