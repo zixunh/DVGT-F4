@@ -1,5 +1,6 @@
 import hashlib
 import importlib.util
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -85,6 +86,42 @@ class MiniDownloadTests(unittest.TestCase):
         self.assertEqual(
             [x["training_eligible"] for x in selected], [False, False, True]
         )
+
+    def test_gated_placeholder_hash_is_refreshed_after_login(self):
+        plan = {
+            "revision": "pinned",
+            "files": [{"path": "sample.zip", "bytes": 7, "sha256": "*" * 64}],
+        }
+        remote = SimpleNamespace(
+            path="sample.zip", size=7, lfs=SimpleNamespace(sha256="a" * 64)
+        )
+        api = SimpleNamespace(get_paths_info=lambda *args, **kwargs: [remote])
+        mini.refresh_authorized_hashes(api, plan)
+        self.assertEqual(plan["files"][0]["sha256"], "a" * 64)
+        remote.lfs.sha256 = "*" * 64
+        with self.assertRaisesRegex(RuntimeError, "Authorized SHA256 unavailable"):
+            mini.refresh_authorized_hashes(api, plan)
+
+    def test_resume_uses_saved_chunk_without_explicit_argument(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan = {
+                "repo_id": mini.REPO,
+                "revision": "pinned",
+                "chunk": 3,
+                "requested_clips": 100,
+                "files": [],
+                "total_bytes": 0,
+            }
+            (root / "download_plan.json").write_text(json.dumps(plan))
+            with (
+                patch("sys.argv", [str(SCRIPT), "--output", str(root)]),
+                patch("huggingface_hub.HfApi", return_value=None),
+            ):
+                mini.main()
+            self.assertEqual(
+                json.loads((root / "download_plan.json").read_text())["chunk"], 3
+            )
 
     def test_hash_mismatch_is_not_marked_verified(self):
         with TemporaryDirectory() as directory:

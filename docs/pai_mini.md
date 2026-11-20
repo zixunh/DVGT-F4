@@ -11,16 +11,16 @@
 
 # 只查询公开文件列表和大小，不下载传感器数据。
 .venv/bin/python tools/data_process/download_pai_mini.py \
-  --output /mnt/raid/dataset/PAI/mini
+  --output /mnt/raid/dataset/PAI/mini --chunk 3
 
 # 下载及断点续传，使用已保存计划中的同一个数据集 commit。
-.venv/bin/python tools/data_process/download_pai_mini.py \
-  --output /mnt/raid/dataset/PAI/mini --download --workers 3
+HF_HUB_DISABLE_XET=1 .venv/bin/python tools/data_process/download_pai_mini.py \
+  --output /mnt/raid/dataset/PAI/mini --download --workers 8 --range-workers 8
 ```
 
-下载器依赖 `huggingface_hub` 和 `pyarrow`。可使用 `--chunk N` 选择其他数据块；不同块或不同版本应使用不同输出目录，避免混合数据。`--wait-for-auth 900` 可等待当前机器配置登录后自动继续。
+下载器依赖 `huggingface_hub` 和 `pyarrow`；启用 HTTP 分段传输时还需要 `requests`。可使用 `--chunk N` 选择其他数据块；续传不传 `--chunk` 时使用已保存的块编号。不同块或不同版本应使用不同输出目录，避免混合数据。`--wait-for-auth 900` 可等待当前机器配置登录后自动继续。
 
-在数据集 commit `14ed7a77897edafb113dc86fde8b8173ae7fb028`，chunk 0 的所选内容与元数据共 19 个文件，45,437,548,382 字节，约 42.32 GiB。正式开始传感器下载前，脚本读取索引检查 clip 数量、有效性与所需传感器/标注是否存在。整个数据集约 100 clips 打包一个 chunk；本脚本下载一个 chunk，不会调用全库 `snapshot_download`。
+在数据集 commit `14ed7a77897edafb113dc86fde8b8173ae7fb028`，本次选择 chunk 3：100 个 clips 的所需数据齐全，官方 `alpamayo_aligned` 划分为 85 train / 15 test，均不在 Foundation4D 评测子集中。所选内容与元数据共 19 个文件，45,875,590,722 字节，约 42.72 GiB。最初检查的 chunk 0 有 4 个 clips 缺少所需数据，因此未下载其传感器文件。正式开始传感器下载前，脚本读取索引检查 clip 数量、有效性与所需传感器/标注是否存在。整个数据集约 100 clips 打包一个 chunk；本脚本下载一个 chunk，不会调用全库 `snapshot_download`。
 
 输出包含：
 
@@ -31,4 +31,6 @@
 
 `training_eligible` 仅在 PAI 原始划分为 train 且不属于 Foundation4D 评测 clips 时为真。一个 chunk 内可能同时含有训练和测试场景；不要把整个 mini 目录当作训练集。微型子集不代表完整数据集的分布或评测成绩。
 
-每个下载文件检查字节数并计算 SHA256；上游提供 LFS SHA256 时进行比对。只有所有文件通过检查，计划状态才写为 `complete`。网络失败后重新执行相同命令即可续传；不要把计划文件存在等同于数据下载完成。
+受限仓库在登录前可能以星号隐藏 LFS 哈希，脚本会在授权通过后重新获取固定版本的真实校验值。每个下载文件检查字节数并计算 SHA256；上游提供 LFS SHA256 时进行比对。只有所有文件通过检查，计划状态才写为 `complete`。网络失败后重新执行相同命令即可续传；不要把计划文件存在等同于数据下载完成。
+
+对于本机上无进度的 Xet 大文件传输，示例使用 `HF_HUB_DISABLE_XET=1` 走 Hub HTTP 续传。`--range-workers 8` 对至少 8 GiB 的文件使用 256 MiB 分段、8 路 HTTP Range 下载，记录各段进度并在合并时核验完整 SHA256。服务端必须返回正确的 206/Content-Range，否则拒绝写入；磁盘预算包含临时分段及合并所需空间。视频等较小文件仍走 Hub 标准续传。

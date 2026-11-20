@@ -13,6 +13,9 @@ import json
 from pathlib import Path
 import shutil
 import time
+import threading
+
+LOG_LOCK = threading.Lock()
 
 REPO = "nvidia/PhysicalAI-Autonomous-Vehicles"
 FEATURES = {
@@ -50,7 +53,8 @@ def write_json(path, value):
 
 
 def log(event, **fields):
-    print(json.dumps({"event": event, **fields}, ensure_ascii=False), flush=True)
+    with LOG_LOCK:
+        print(json.dumps({"event": event, **fields}, ensure_ascii=False), flush=True)
 
 
 def wanted_files(chunk):
@@ -100,6 +104,28 @@ def public_file_metadata(api, revision, paths):
         for entries in pool.map(read_directory, parents.items()):
             files.extend(entries)
     return sorted(files, key=lambda entry: entry["path"])
+
+
+def refresh_authorized_hashes(api, plan):
+    """Replace the masked LFS hashes returned for gated files before login."""
+    import re
+
+    entries = api.get_paths_info(
+        REPO,
+        [entry["path"] for entry in plan["files"]],
+        repo_type="dataset",
+        revision=plan["revision"],
+    )
+    resolved = {entry.path: entry for entry in entries}
+    for entry in plan["files"]:
+        remote = resolved.get(entry["path"])
+        if remote is None or remote.size != entry["bytes"]:
+            raise RuntimeError(f"Pinned file metadata changed: {entry['path']}")
+        lfs = getattr(remote, "lfs", None)
+        digest = getattr(lfs, "sha256", None)
+        if lfs is not None and not re.fullmatch(r"[0-9a-f]{64}", digest or ""):
+            raise RuntimeError(f"Authorized SHA256 unavailable: {entry['path']}")
+        entry["sha256"] = digest
 
 
 def wait_for_access(seconds):
@@ -204,7 +230,7 @@ def annotate_foundation4d_membership(api, clips):
     return {"repo_id": repo, "revision": revision}
 
 
-def download_one(root, revision, entry, previous):
+def download_one(root, revision, entry, previous, range_workers=0):
     from huggingface_hub import hf_hub_download
 
     path = root / entry["path"]
@@ -220,21 +246,46 @@ def download_one(root, revision, entry, previous):
             log("verified_file_reused", path=entry["path"])
             return old
     log("downloading", path=entry["path"], bytes=entry["bytes"])
-    filename = hf_hub_download(
-        repo_id=REPO,
-        repo_type="dataset",
-        revision=revision,
-        filename=entry["path"],
-        local_dir=root,
-    )
+    ranged = range_workers > 0 and entry["bytes"] >= 8 * 1024**3
+    if ranged:
+        from huggingface_hub import hf_hub_url
+        from huggingface_hub.utils import build_hf_headers
+        from pai_http_range import download_ranges
+
+        filename = download_ranges(
+            hf_hub_url(REPO, entry["path"], repo_type="dataset", revision=revision),
+            build_hf_headers(),
+            root / entry["path"],
+            entry["bytes"],
+            entry["sha256"],
+            workers=range_workers,
+            report=lambda done, total: log(
+                "range_progress",
+                path=entry["path"],
+                completed_bytes=done,
+                total_bytes=total,
+            ),
+        )
+    else:
+        filename = hf_hub_download(
+            repo_id=REPO,
+            repo_type="dataset",
+            revision=revision,
+            filename=entry["path"],
+            local_dir=root,
+        )
     stat = Path(filename).stat()
     if stat.st_size != entry["bytes"]:
         raise RuntimeError(f"Unexpected size for {entry['path']}")
-    digest = hashlib.sha256()
-    with open(filename, "rb") as stream:
-        for block in iter(lambda: stream.read(8 * 1024 * 1024), b""):
-            digest.update(block)
-    observed = digest.hexdigest()
+    if ranged:
+        # The range transport verifies the complete SHA256 while assembling.
+        observed = entry["sha256"]
+    else:
+        digest = hashlib.sha256()
+        with open(filename, "rb") as stream:
+            for block in iter(lambda: stream.read(8 * 1024 * 1024), b""):
+                digest.update(block)
+        observed = digest.hexdigest()
     if entry["sha256"] and entry["sha256"] != observed:
         raise RuntimeError(
             f"SHA256 mismatch for {entry['path']}; remove this file before retrying."
@@ -255,7 +306,9 @@ def main():
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--chunk", type=int, default=0)
+    parser.add_argument(
+        "--chunk", type=int, help="Defaults to saved plan chunk, or 0 for a new plan."
+    )
     parser.add_argument("--expected-clips", type=int, default=100)
     parser.add_argument(
         "--revision", help="Defaults to saved plan revision, or current main."
@@ -267,11 +320,18 @@ def main():
     )
     parser.add_argument("--wait-for-auth", type=int, default=0, metavar="SECONDS")
     parser.add_argument("--workers", type=int, default=3)
+    parser.add_argument(
+        "--range-workers",
+        type=int,
+        default=0,
+        help="Parallel HTTP ranges for files >=8 GiB; 0 uses the Hub transport.",
+    )
     args = parser.parse_args()
     if (
-        args.chunk < 0
+        (args.chunk is not None and args.chunk < 0)
         or args.expected_clips < 1
         or args.workers < 1
+        or args.range_workers < 0
         or args.wait_for_auth < 0
     ):
         parser.error("Invalid count, chunk, worker or wait parameter.")
@@ -280,6 +340,10 @@ def main():
     root.mkdir(parents=True, exist_ok=True)
     api = HfApi()
     plan_path = root / "download_plan.json"
+    if args.chunk is None:
+        args.chunk = (
+            json.loads(plan_path.read_text())["chunk"] if plan_path.exists() else 0
+        )
     if plan_path.exists():
         plan = json.loads(plan_path.read_text())
         if (
@@ -315,6 +379,8 @@ def main():
     if not args.download:
         return
     wait_for_access(args.wait_for_auth)
+    refresh_authorized_hashes(api, plan)
+    write_json(plan_path, plan)
     remaining = sum(
         max(
             0,
@@ -327,7 +393,19 @@ def main():
         )
         for entry in plan["files"]
     )
-    if shutil.disk_usage(root).free < remaining + 5 * 1024**3:
+    range_reserve = (
+        max(
+            (
+                entry["bytes"]
+                for entry in plan["files"]
+                if entry["bytes"] >= 8 * 1024**3
+            ),
+            default=0,
+        )
+        if args.range_workers
+        else 0
+    )
+    if shutil.disk_usage(root).free < remaining + range_reserve + 5 * 1024**3:
         raise RuntimeError(
             "Not enough free space for the remaining files plus a 5 GiB reserve."
         )
@@ -355,10 +433,16 @@ def main():
     )
     write_json(plan_path, plan)
     sensor_files = [entry for entry in plan["files"] if entry["path"] not in METADATA]
+    sensor_files.sort(key=lambda entry: entry["bytes"], reverse=True)
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
         futures = {
             pool.submit(
-                download_one, root, plan["revision"], entry, dict(verified)
+                download_one,
+                root,
+                plan["revision"],
+                entry,
+                dict(verified),
+                args.range_workers,
             ): entry["path"]
             for entry in sensor_files
         }
