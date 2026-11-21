@@ -26,8 +26,15 @@ FLOAT_FIELDS = {
     "target_range",
     "target_non_sky",
 }
-INT_FIELDS = {"semantics", "box_labels", "box_ids", "occupancy", "target_box_ids"}
-BOOL_FIELDS = {"target_valid"}
+INT_FIELDS = {
+    "semantics",
+    "box_labels",
+    "box_ids",
+    "occupancy",
+    "occupancy_binary",
+    "target_box_ids",
+}
+BOOL_FIELDS = {"target_valid", "image_valid", "box_velocity_valid"}
 
 
 def load_frame(record, root):

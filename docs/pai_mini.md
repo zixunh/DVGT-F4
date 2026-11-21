@@ -2,7 +2,7 @@
 
 `tools/data_process/download_pai_mini.py` 从 PhysicalAI 主数据集下载一个数据块，默认要求恰好 100 个有效 clips。下载内容为六相机（不包含 rear tele）、顶部 LiDAR、offline 相机/LiDAR 标定、传感器外参、自车尺寸、自车位姿和障碍物框轨迹。原始 ZIP 保持压缩，后续读取器可按 clip 读取。
 
-这不是 NVIDIA 单独发布的 mini benchmark，也不包含完整的 Foundation4D 稠密深度、图像语义或 occupancy 标签。这里提供原始数据子集的可重现下载；仍需后续数据转换与标注生成，才能供 `stream4d` 训练。
+这不是 NVIDIA 单独发布的 mini benchmark，也不包含完整的 Foundation4D 稠密深度、图像语义或 occupancy 标签。原始数据可通过现有 [PAI 适配与训练流程](pai_training.md) 转为 `stream4d` 输入，提供稀疏深度、3D 框、二值占据和留出 RGB；稠密语义标注仍需另行生成。
 
 先在 [数据集页面](https://huggingface.co/datasets/nvidia/PhysicalAI-Autonomous-Vehicles) 完成访问授权，再在下载机器、当前用户下登录。网页登录不会自动配置终端凭据。
 

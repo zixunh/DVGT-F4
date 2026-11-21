@@ -10,5 +10,16 @@
   "dinov3_commit": "6876159a11b4df116f30f667f8c9888617df0751",
   "checkpoint_revision": "48fcdf265aa3bfbe1d613f7b656719e744279b5e",
   "checkpoint_sha256": "a1dafdfbe022824f36fe379531d24b50398509375c06fef2aafb0008b0744af6",
-  "checkpoint_bytes": 6840965134
+  "checkpoint_bytes": 6840965134,
+  "pai_adapter_references": {
+    "physical_ai_av_repository": "https://github.com/NVlabs/physical_ai_av",
+    "physical_ai_av_commit": "87f0208b2da4058d00e5ac0d0404d8ef7beb417d",
+    "wiki_commit": "55104756a2ba5c7340dfe185cb7ae38d0991ff2d",
+    "ncore_repository": "https://github.com/NVIDIA/ncore",
+    "ncore_commit": "bf884ac62b323ae58b992e1c995a19f0b8b81da9",
+    "ncore_converter_sha256": "68cbafd726249683f925370eba4602deb94552412cfa0528da93ca3df171d761",
+    "ncore_utils_sha256": "45dd2f25b5cecf0e231a3b023956f050ff0446928df37e0d5910893e6e4b261a",
+    "dracopy": "1.7.0",
+    "dataset_revision": "14ed7a77897edafb113dc86fde8b8173ae7fb028"
+  }
 }

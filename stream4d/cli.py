@@ -29,6 +29,25 @@ def make_model(args):
 
 
 def check_source(frame, model, args):
+    if frame.get("dataset") == "pai":
+        from .pai.annotations import DETECTION_CLASSES
+
+        if frame.get(
+            "detection_classes"
+        ) != DETECTION_CLASSES or model.config.heads.detection_classes != len(
+            DETECTION_CLASSES
+        ):
+            raise ValueError("PAI detection class mapping does not match the model")
+        if frame.get("occupancy_bounds") != model.config.heads.occupancy_bounds:
+            raise ValueError("PAI occupancy bounds differ from the configured grid")
+        if args.command == "train" and (
+            frame.get("split") != "train"
+            or frame.get("training_eligible") is not True
+            or frame.get("foundation4d_eval") is not False
+        ):
+            raise ValueError(
+                "PAI training requires eligible train clips and excludes test/Foundation4D evaluation clips"
+            )
     if model.config.backend.name == "tiny" and not frame.get("synthetic", False):
         raise ValueError(
             "Tiny backend is restricted to declared synthetic integration fixtures"
@@ -64,6 +83,11 @@ def train(args):
     last_loss = None
     synthetic = False
     started = time.monotonic()
+    trained_tasks = set(getattr(model, "trained_tasks", []))
+    supervision = set()
+    datasets = set()
+    if args.device.startswith("cuda"):
+        torch.cuda.reset_peak_memory_stats()
     with (root / "train.jsonl").open("w") as log:
         while steps < args.steps:
             state = None
@@ -75,6 +99,7 @@ def train(args):
                     state = None
                     scene = frame["scene_id"]
                 synthetic = synthetic or bool(frame.get("synthetic", False))
+                datasets.add(frame.get("dataset", "unspecified"))
                 frame = to_device(frame, args.device)
                 optimizer.zero_grad(set_to_none=True)
                 pred, state = model(frame, state)
@@ -90,6 +115,12 @@ def train(args):
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(params, 1.0, error_if_nonfinite=True)
                 optimizer.step()
+                supervision.update(k for k in detail if k != "total")
+                trained_tasks.update(
+                    k
+                    for k, value in detail.items()
+                    if k != "total" and value.requires_grad
+                )
                 steps += 1
                 count += 1
                 values = {k: float(v.detach()) for k, v in detail.items()}
@@ -105,6 +136,7 @@ def train(args):
                     break
             if count == 0:
                 raise ValueError("Training manifest contains no frames")
+    model.trained_tasks = sorted(trained_tasks)
     save_adapter(root / "adapter.pt", model, args.stage, steps, synthetic)
     summary = dict(
         stage=args.stage,
@@ -116,6 +148,13 @@ def train(args):
         trainable_parameters=sum(p.numel() for p in params),
         pretrained_geometry=model.backend.pretrained,
         lpips=args.lpips,
+        datasets=sorted(datasets),
+        manifest=str(Path(args.manifest).resolve()),
+        supervision=sorted(supervision),
+        trained_tasks=model.trained_tasks,
+        peak_cuda_mb=torch.cuda.max_memory_allocated() / 2**20
+        if args.device.startswith("cuda")
+        else None,
     )
     json_write(root / "summary.json", summary)
     print(json.dumps(summary), flush=True)
@@ -214,6 +253,7 @@ def infer(args):
         last_state=last_stats,
         pretrained_geometry=model.backend.pretrained,
         trained_stages=saved.get("trained_stages", []),
+        trained_tasks=saved.get("trained_tasks", []),
         synthetic_checkpoint=saved.get("synthetic", False),
         depth_mae_m=None if not depth_count else depth_abs / depth_count,
         peak_cuda_mb=torch.cuda.max_memory_allocated() / 2**20

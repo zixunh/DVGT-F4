@@ -37,8 +37,13 @@ def focal(logits, targets):
     )
 
 
-def detection_loss(layers, boxes, labels):
+def detection_loss(layers, boxes, labels, velocity_valid=None):
     valid = labels >= 0
+    if velocity_valid is None:
+        velocity_valid = torch.ones_like(labels, dtype=torch.bool)
+    if velocity_valid.shape != labels.shape:
+        raise ValueError("box_velocity_valid must match box_labels")
+    velocity_valid = velocity_valid[valid].bool()
     boxes, labels = boxes[valid], labels[valid].long()
     if len(boxes) and ((boxes[:, 3:6] <= 0).any() or not torch.isfinite(boxes).all()):
         raise ValueError("Invalid detection annotations")
@@ -59,24 +64,54 @@ def detection_loss(layers, boxes, labels):
             raise ValueError("Detection label out of range")
         target = torch.zeros_like(logits)
         regression = pred.sum() * 0
-        weight = pred.new_tensor([1, 1, 1, 1, 1, 1, 1, 1, 0.2, 0.2])
+        weight = (
+            pred.new_tensor([1, 1, 1, 1, 1, 1, 1, 1, 0.2, 0.2])
+            .expand(len(labels), -1)
+            .clone()
+        )
+        weight[:, 8:] *= velocity_valid[:, None]
         if len(labels):
             with torch.no_grad():
                 p = logits.sigmoid().clamp(1e-6, 1 - 1e-6)
                 cost_cls = -0.25 * (1 - p) ** 2 * p.log() + 0.75 * p**2 * (1 - p).log()
-                cost = 2 * cost_cls[:, labels] + 0.25 * torch.cdist(
-                    pred * weight, encoded * weight, p=1
+                distance = ((pred[:, None] - encoded[None]).abs() * weight[None]).sum(
+                    -1
                 )
+                cost = 2 * cost_cls[:, labels] + 0.25 * distance
                 row, col = linear_sum_assignment(cost.cpu().numpy())
                 row = torch.as_tensor(row, device=pred.device)
                 col = torch.as_tensor(col, device=pred.device)
             target[row, labels[col]] = 1
-            regression = ((pred[row] - encoded[col]).abs() * weight).sum() / max(
+            regression = ((pred[row] - encoded[col]).abs() * weight[col]).sum() / max(
                 len(labels), 1
             )
         terms.append(
             2 * focal(logits, target).sum() / max(len(labels), 1) + 0.25 * regression
         )
+    return torch.stack(terms).mean()
+
+
+def binary_occupancy_loss(layers, labels):
+    """Sparse LiDAR hit/free supervision, with no gradient to semantic classifiers."""
+    if ((labels < -1) | (labels > 1)).any():
+        raise ValueError("Binary occupancy uses -1 unknown, 0 free, 1 occupied")
+    terms = []
+    for layer in layers:
+        logits = layer["binary_logits"]
+        if labels.shape != logits.shape:
+            raise ValueError(
+                "Binary occupancy grid must match the configured XYZ shape"
+            )
+        classes = []
+        for value in (0, 1):
+            mask = labels == value
+            if mask.any():
+                classes.append(
+                    F.binary_cross_entropy_with_logits(
+                        logits[mask], torch.full_like(logits[mask], value)
+                    )
+                )
+        terms.append(torch.stack(classes).mean() if classes else logits.sum() * 0)
     return torch.stack(terms).mean()
 
 
@@ -226,7 +261,6 @@ def reconstruction_loss(pred, frame, renderer, perceptual=None):
 
 def multitask_loss(pred, frame, config, stage="perception", perceptual=None):
     losses = {}
-    zero = pred["semantic_logits"].sum() * 0
     if stage != "gaussian":
         if "semantics" in frame:
             losses["semantic"] = semantic_loss(
@@ -234,11 +268,18 @@ def multitask_loss(pred, frame, config, stage="perception", perceptual=None):
             )
         if "boxes" in frame and "box_labels" in frame:
             losses["detection"] = 0.1 * detection_loss(
-                pred["detections"], frame["boxes"], frame["box_labels"]
+                pred["detections"],
+                frame["boxes"],
+                frame["box_labels"],
+                frame.get("box_velocity_valid"),
             )
         if "occupancy" in frame:
             losses["occupancy"] = 0.2 * occupancy_loss(
                 pred["occupancy"], frame["occupancy"]
+            )
+        elif "occupancy_binary" in frame:
+            losses["occupancy_binary"] = 0.2 * binary_occupancy_loss(
+                pred["occupancy"], frame["occupancy_binary"]
             )
         if "depth_z" in frame:
             gt = frame["depth_z"]
@@ -258,5 +299,7 @@ def multitask_loss(pred, frame, config, stage="perception", perceptual=None):
         )
     if not losses:
         raise ValueError("No applicable supervision was provided")
-    total = sum(losses.values(), zero)
+    # An unrelated zero-valued graph creates zero gradients and AdamW decay on
+    # unsupervised heads, and hides frozen-geometry-only training mistakes.
+    total = torch.stack(list(losses.values())).sum()
     return total, {**losses, "total": total}

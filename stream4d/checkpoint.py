@@ -18,6 +18,7 @@ def save_adapter(path, model, stage, steps, synthetic):
         heads=model.heads.state_dict(),
         backend=backend,
         trained_stages=sorted(set(getattr(model, "trained_stages", [])) | {stage}),
+        trained_tasks=sorted(getattr(model, "trained_tasks", [])),
         steps=steps,
         synthetic=synthetic,
     )
@@ -42,5 +43,6 @@ def load_adapter(path, device="cpu"):
         if report.unexpected_keys:
             raise ValueError(f"Unexpected backbone keys: {report.unexpected_keys}")
     model.trained_stages = saved["trained_stages"]
+    model.trained_tasks = saved.get("trained_tasks", [])
     model.synthetic_checkpoint = bool(saved["synthetic"])
     return model.to(device), saved

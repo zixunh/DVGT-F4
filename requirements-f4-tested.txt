@@ -17,3 +17,7 @@ huggingface-hub==2.4.0
 psutil==7.2.2
 gsplat==1.5.3
 lpips==0.1.4
+# Local PAI adapter; no full physical_ai_av/NCore runtime dependency.
+pyarrow==21.0.0
+opencv-python-headless==4.10.0.84
+DracoPy==1.7.0

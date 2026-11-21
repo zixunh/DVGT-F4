@@ -1,6 +1,6 @@
 {
-  "status": "experimental_streaming_baseline_with_verified_official_dvgt2_geometry",
-  "checked_at_utc": "2026-11-19T19:19:42.444963+00:00",
+  "status": "experimental_streaming_baseline_with_verified_real_pai_data_pipeline",
+  "checked_at_utc": "2026-11-21T00:14:38.455027+00:00",
   "fork": "https://github.com/zixunh/DVGT-F4",
   "branch": "feat/streaming-foundation4d",
   "upstream": {
@@ -38,11 +38,18 @@
     "reference and CUDA gsplat backends with matched pixel-center convention",
     "lazy per-frame JSONL input and per-frame output writing",
     "perception, Gaussian warmup and joint training; adapter checkpoints",
-    "optional last-block fine-tuning with detached past state"
+    "optional last-block fine-tuning with detached past state",
+    "local PAI offline f-theta rectification with reference-polynomial inversion and ego masks",
+    "streaming ZIP member access and named Draco per-point timestamp decoding",
+    "single-past-sweep ego-motion-compensated sparse z-depth and conservative binary occupancy",
+    "PAI 12-class cuboid autolabels, stable track IDs and masked absolute-velocity supervision",
+    "held-out future RGB targets with consistent world poses and moving-box targets",
+    "PAI train/test and Foundation4D evaluation exclusion guards",
+    "per-task training provenance and no weight decay on absent semantic classifiers"
   ],
   "verification": {
     "unit_tests": {
-      "passed": 18,
+      "passed": 22,
       "command": ".venv/bin/python -m unittest discover -s tests/stream4d -v",
       "long_stream_fixture_frames": 80
     },
@@ -336,18 +343,459 @@
       "depth_mae_m": 16.91335703531901,
       "peak_cuda_mb": 6689.9052734375
     },
-    "editable_install_and_cli": true
+    "editable_install_and_cli": true,
+    "data_process_unit_tests": {
+      "passed": 16,
+      "command": ".venv/bin/python -m unittest discover -s tests/data_process -v"
+    },
+    "pai_data_conversion": {
+      "raw_root": "/mnt/raid/dataset/PAI/mini",
+      "converted_root": "/mnt/raid/dataset/PAI/mini_stream4d",
+      "command": ".venv/bin/python tools/data_process/prepare_pai.py --output /mnt/raid/dataset/PAI/mini_stream4d --workers 4 --fps 2",
+      "audit_command": ".venv/bin/python tools/data_process/check_pai_conversion.py --data /mnt/raid/dataset/PAI/mini_stream4d",
+      "report": {
+        "status": "passed",
+        "checked_at_utc": "2026-11-21T00:11:05.277032+00:00",
+        "fingerprint": "811e5240014eaae305b77e0036223fc93809ab50763f3dec3ce00187798726f0",
+        "clips": 100,
+        "split_clips": {
+          "test": 15,
+          "train": 85
+        },
+        "split_frames": {
+          "test": 574,
+          "train": 3250
+        },
+        "counts": {
+          "frames": 3824,
+          "boxes": 73615,
+          "image_pixels": 352419840,
+          "measured_depth_pixels": 171815715,
+          "occupancy_free": 10755054,
+          "occupancy_occupied": 9217890,
+          "occupancy_unknown": 53447856,
+          "npz_bytes": 2169205008
+        },
+        "depth_valid_fraction": 0.48753133478523797,
+        "max_camera_skew_us": 16253,
+        "manifest_sha256": {
+          "test": "cd768f0c5929e0e884672702c4ae74681505439a489eeb5e02ace1078b226ece",
+          "train": "334f1894a6ba7cb62ed2dae027bfa08bf0bdab8c51de545124c1d9f39dc0c25d"
+        },
+        "heldout_rgb_disjoint_from_all_source_frames": true,
+        "official_split_verified": true
+      },
+      "limitations": [
+        "Mid-readout global-shutter approximation; no per-row rolling-shutter correction",
+        "Fixed rig calibration with bounded camera skew; no image warping across asynchronous views",
+        "Single past LiDAR sweep with per-point ego-motion compensation; no moving-object deskew",
+        "Sparse measured depth and binary ray occupancy, not Foundation4D dense/semantic labels",
+        "Offline cuboids are NVIDIA autolabels, not manual ground truth"
+      ]
+    },
+    "pai_smoke": {
+      "command": "bash tools/stream4d/pai_smoke.sh",
+      "passed": true,
+      "train_clips": 1,
+      "test_clips": 1,
+      "frames_per_clip": 8,
+      "input_hw": [
+        96,
+        160
+      ],
+      "views": 6,
+      "stages": {
+        "perception": {
+          "stage": "perception",
+          "steps": 16,
+          "first_loss": 2.217050313949585,
+          "last_loss": 1.0948604345321655,
+          "elapsed_seconds": 2.7558671133592725,
+          "synthetic": false,
+          "trainable_parameters": 568907,
+          "pretrained_geometry": true,
+          "lpips": false,
+          "datasets": [
+            "pai"
+          ],
+          "manifest": "/mnt/raid/dataset/PAI/mini_stream4d_smoke/train.jsonl",
+          "supervision": [
+            "depth",
+            "detection",
+            "occupancy_binary"
+          ],
+          "trained_tasks": [
+            "detection",
+            "occupancy_binary"
+          ],
+          "peak_cuda_mb": 7634.60595703125
+        },
+        "gaussian": {
+          "stage": "gaussian",
+          "steps": 4,
+          "first_loss": 0.14941886067390442,
+          "last_loss": 0.16458773612976074,
+          "elapsed_seconds": 1.5895257508382201,
+          "synthetic": false,
+          "trainable_parameters": 48155,
+          "pretrained_geometry": true,
+          "lpips": false,
+          "datasets": [
+            "pai"
+          ],
+          "manifest": "/mnt/raid/dataset/PAI/mini_stream4d_smoke/train.jsonl",
+          "supervision": [
+            "gaussian"
+          ],
+          "trained_tasks": [
+            "detection",
+            "gaussian",
+            "occupancy_binary"
+          ],
+          "peak_cuda_mb": 7565.57275390625
+        },
+        "joint": {
+          "stage": "joint",
+          "steps": 4,
+          "first_loss": 1.3242738246917725,
+          "last_loss": 1.242112398147583,
+          "elapsed_seconds": 1.9207513378933072,
+          "synthetic": false,
+          "trainable_parameters": 617062,
+          "pretrained_geometry": true,
+          "lpips": false,
+          "datasets": [
+            "pai"
+          ],
+          "manifest": "/mnt/raid/dataset/PAI/mini_stream4d_smoke/train.jsonl",
+          "supervision": [
+            "depth",
+            "detection",
+            "gaussian",
+            "occupancy_binary"
+          ],
+          "trained_tasks": [
+            "detection",
+            "gaussian",
+            "occupancy_binary"
+          ],
+          "peak_cuda_mb": 7569.34423828125
+        },
+        "test": {
+          "frames": 8,
+          "elapsed_seconds": 2.8970551416277885,
+          "peak_backbone_state_bytes": 260997120,
+          "last_state": {
+            "scene_id": "0b501241-5ce3-45a1-92bb-298c2b761687",
+            "timestamp": 3.666614,
+            "pretrained_geometry": true,
+            "new_heads_trained": true,
+            "trained_stages": [
+              "gaussian",
+              "joint",
+              "perception"
+            ],
+            "trained_tasks": [
+              "detection",
+              "gaussian",
+              "occupancy_binary"
+            ],
+            "frames": 8,
+            "backbone_bytes": 260997120,
+            "tracks": 0,
+            "static_gaussians": 12000,
+            "actor_gaussians": 0,
+            "active_actor_maps": 0
+          },
+          "pretrained_geometry": true,
+          "trained_stages": [
+            "gaussian",
+            "joint",
+            "perception"
+          ],
+          "trained_tasks": [
+            "detection",
+            "gaussian",
+            "occupancy_binary"
+          ],
+          "synthetic_checkpoint": false,
+          "depth_mae_m": 19.55606411910324,
+          "peak_cuda_mb": 7619.43896484375
+        }
+      },
+      "finetune_validation": {
+        "real_data": true,
+        "benchmark_accuracy_claimed": false,
+        "official_load": {
+          "checkpoint": "/home/admins/Documents/2026_bov/baselines/DVGT-F4/checkpoints/dvgt2.pt",
+          "keys": 1951,
+          "parameters": 1709991782,
+          "missing_keys": [],
+          "unexpected_keys": []
+        },
+        "train_scene": "02fd3a17-5936-4098-849f-50ae34d07370",
+        "test_scene": "0b501241-5ce3-45a1-92bb-298c2b761687",
+        "views": 6,
+        "input_hw": [
+          96,
+          160
+        ],
+        "train_steps": 5,
+        "losses": [
+          {
+            "detection": 1.6401222944259644,
+            "occupancy_binary": 0.14368747174739838,
+            "depth": 0.4332405626773834,
+            "total": 2.217050313949585
+          },
+          {
+            "detection": 1.2106088399887085,
+            "occupancy_binary": 0.14084124565124512,
+            "depth": 0.437363862991333,
+            "total": 1.7888139486312866
+          },
+          {
+            "detection": 0.8266154527664185,
+            "occupancy_binary": 0.13931797444820404,
+            "depth": 0.3705426752567291,
+            "total": 1.3364760875701904
+          },
+          {
+            "detection": 0.6362404227256775,
+            "occupancy_binary": 0.1373315453529358,
+            "depth": 0.3825605809688568,
+            "total": 1.156132459640503
+          },
+          {
+            "detection": 0.6364550590515137,
+            "occupancy_binary": 0.13737265765666962,
+            "depth": 0.3753529191017151,
+            "total": 1.14918053150177
+          }
+        ],
+        "updated_heads": {
+          "detection": true,
+          "occupancy_binary": true
+        },
+        "unsupervised_classifiers_unchanged": {
+          "image_semantics": true,
+          "occupancy_semantics": true,
+          "bev_semantics": true
+        },
+        "trained_tasks": [
+          "depth",
+          "detection",
+          "occupancy_binary"
+        ],
+        "finetune_last_blocks": 1,
+        "backbone_updated": true,
+        "backbone_parameters_with_grad": 54,
+        "peak_training_cuda_mb": 8214.5546875,
+        "test_frames": 8,
+        "state_samples": [
+          {
+            "frames": 1,
+            "backbone_bytes": 65249280,
+            "tracks": 0,
+            "static_gaussians": 1736,
+            "actor_gaussians": 0,
+            "active_actor_maps": 0
+          },
+          {
+            "frames": 2,
+            "backbone_bytes": 130498560,
+            "tracks": 0,
+            "static_gaussians": 3503,
+            "actor_gaussians": 0,
+            "active_actor_maps": 0
+          },
+          {
+            "frames": 3,
+            "backbone_bytes": 195747840,
+            "tracks": 0,
+            "static_gaussians": 5300,
+            "actor_gaussians": 0,
+            "active_actor_maps": 0
+          },
+          {
+            "frames": 4,
+            "backbone_bytes": 260997120,
+            "tracks": 0,
+            "static_gaussians": 7115,
+            "actor_gaussians": 0,
+            "active_actor_maps": 0
+          },
+          {
+            "frames": 5,
+            "backbone_bytes": 260997120,
+            "tracks": 0,
+            "static_gaussians": 8885,
+            "actor_gaussians": 0,
+            "active_actor_maps": 0
+          },
+          {
+            "frames": 6,
+            "backbone_bytes": 260997120,
+            "tracks": 0,
+            "static_gaussians": 10654,
+            "actor_gaussians": 0,
+            "active_actor_maps": 0
+          },
+          {
+            "frames": 7,
+            "backbone_bytes": 260997120,
+            "tracks": 0,
+            "static_gaussians": 12000,
+            "actor_gaussians": 0,
+            "active_actor_maps": 0
+          },
+          {
+            "frames": 8,
+            "backbone_bytes": 260997120,
+            "tracks": 0,
+            "static_gaussians": 12000,
+            "actor_gaussians": 0,
+            "active_actor_maps": 0
+          }
+        ],
+        "sparse_depth_mae_m": 19.555015733412365
+      }
+    },
+    "pai_all_scene_warmup": {
+      "recipe": {
+        "purpose": "pipeline coverage warmup, not convergence training",
+        "raw_revision": "14ed7a77897edafb113dc86fde8b8173ae7fb028",
+        "converted_data": "/mnt/raid/dataset/PAI/mini_stream4d",
+        "train_clips": 85,
+        "perception": "first two sampled frames per official train clip; 170 steps",
+        "gaussian": "first sampled frame per official train clip; 85 steps",
+        "evaluation": "all 574 frames from 15 official test clips",
+        "backbone": "frozen official DVGT-2",
+        "input_hw": [
+          96,
+          160
+        ],
+        "views": 6
+      },
+      "stages": {
+        "perception": {
+          "stage": "perception",
+          "steps": 170,
+          "first_loss": 2.217050313949585,
+          "last_loss": 1.1136391162872314,
+          "elapsed_seconds": 14.2289743963629,
+          "synthetic": false,
+          "trainable_parameters": 568907,
+          "pretrained_geometry": true,
+          "lpips": false,
+          "datasets": [
+            "pai"
+          ],
+          "manifest": "/home/admins/Documents/2026_bov/baselines/DVGT-F4/outputs/pai_mini_warmup/perception_frames.jsonl",
+          "supervision": [
+            "depth",
+            "detection",
+            "occupancy_binary"
+          ],
+          "trained_tasks": [
+            "detection",
+            "occupancy_binary"
+          ],
+          "peak_cuda_mb": 7082.14892578125
+        },
+        "gaussian": {
+          "stage": "gaussian",
+          "steps": 85,
+          "first_loss": 0.18502862751483917,
+          "last_loss": 0.12222343683242798,
+          "elapsed_seconds": 7.799386287108064,
+          "synthetic": false,
+          "trainable_parameters": 48155,
+          "pretrained_geometry": true,
+          "lpips": false,
+          "datasets": [
+            "pai"
+          ],
+          "manifest": "/home/admins/Documents/2026_bov/baselines/DVGT-F4/outputs/pai_mini_warmup/gaussian_frames.jsonl",
+          "supervision": [
+            "gaussian"
+          ],
+          "trained_tasks": [
+            "detection",
+            "gaussian",
+            "occupancy_binary"
+          ],
+          "peak_cuda_mb": 6909.0224609375
+        },
+        "test": {
+          "frames": 574,
+          "elapsed_seconds": 77.8871428091079,
+          "peak_backbone_state_bytes": 260997120,
+          "last_state": {
+            "scene_id": "f1b3b123-58a0-4d01-9ab0-7d87e4bdef0e",
+            "timestamp": 19.166594,
+            "pretrained_geometry": true,
+            "new_heads_trained": true,
+            "trained_stages": [
+              "gaussian",
+              "perception"
+            ],
+            "trained_tasks": [
+              "detection",
+              "gaussian",
+              "occupancy_binary"
+            ],
+            "frames": 38,
+            "backbone_bytes": 260997120,
+            "tracks": 0,
+            "static_gaussians": 12000,
+            "actor_gaussians": 0,
+            "active_actor_maps": 0
+          },
+          "pretrained_geometry": true,
+          "trained_stages": [
+            "gaussian",
+            "perception"
+          ],
+          "trained_tasks": [
+            "detection",
+            "gaussian",
+            "occupancy_binary"
+          ],
+          "synthetic_checkpoint": false,
+          "depth_mae_m": 16.79741424743597,
+          "peak_cuda_mb": 7619.07470703125
+        }
+      },
+      "test_state_audit": {
+        "passed": true,
+        "test_frames": 574,
+        "test_clips": 15,
+        "per_scene_state_reset": true,
+        "bounded_cache_after_frame_4": true,
+        "max_backbone_bytes": 260997120,
+        "max_static_gaussians": 12000,
+        "max_tracks": 52,
+        "frames_with_tracks": 350,
+        "max_actor_gaussians": 28,
+        "accuracy_claimed": false
+      },
+      "checkpoint": "outputs/pai_mini_warmup/gaussian/adapter.pt",
+      "converged": false,
+      "benchmark_accuracy_claimed": false
+    }
   },
   "not_claimed": [
     "Foundation4D paper-faithful architecture or published metric reproduction",
-    "real-data-trained semantic/detection/occupancy/Gaussian weights",
-    "Physical AI or Waymo native data adapter and official benchmark scores",
-    "native f-theta, rolling shutter or asynchronous motion compensation",
+    "converged real-data multitask weights; image/occupancy/BEV semantic classifiers remain untrained",
+    "Waymo native data adapter or official benchmark scores",
+    "model-internal distorted-camera projection, per-row rolling shutter or asynchronous RGB motion compensation",
     "full-video global PGO/loop closure or unlimited retained world map",
     "offline two-pass tracking and RTS smoothing",
     "joint retraining of original DVGT-2 diffusion pose/planning head",
     "full-resolution six-camera real-time throughput on 24GB GPU",
     "LPIPS-enabled optimization validated in this session"
   ],
-  "training_data_notice": "All executed training and inference examples used labeled synthetic fixtures. Only the geometry backbone has official real-data pretrained weights."
+  "training_data_notice": "Real PAI pipeline validation uses only eligible train clips: one-clip smoke plus 170 perception steps and 85 Gaussian steps covering all 85 train clips. All 574 frames of 15 separate test clips were used for inference only. Geometry additionally passed 5-step last-block finetuning on one train clip. These are short integration warmups, not converged weights or Foundation4D benchmark reproduction. Image semantics, semantic occupancy and BEV semantics remain unsupervised.",
+  "pai_adapter_sources": "See upstream.lock.json:pai_adapter_references for pinned NVIDIA format references."
 }

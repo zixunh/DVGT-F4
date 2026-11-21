@@ -62,7 +62,7 @@ bash tools/stream4d/smoke.sh
 
 ## 数据接口
 
-PAI 原始数据小子集的下载、访问授权和划分说明见 [PAI mini](docs/pai_mini.md)。该下载器保留原始数据，转换为下述训练格式仍需数据适配。
+PAI 原始数据小子集的下载、访问授权和划分说明见 [PAI mini](docs/pai_mini.md)。现已提供 [PAI 适配与训练流程](docs/pai_training.md)：六相机 f-theta 去畸变、逐点 LiDAR 自车运动补偿、自动标注框、二值占据及留出帧重建监督。入口为 `tools/data_process/prepare_pai.py`，使用 `configs/stream4d/pai.yaml`；`bash tools/stream4d/pai_smoke.sh` 验证真实数据的训练和在线推理。
 
 输入为 JSONL，每行指向一个时间戳的多相机样本；读取器逐行加载单帧，不将整个视频放入内存。示例：
 
@@ -85,8 +85,10 @@ NPZ 使用 `allow_pickle=False`。也可在 JSON 行中指定 `image_paths`，�
 | `boxes` | 可选 `[N,9]`：`cx,cy,cz,dx,dy,dz,yaw,vx,vy`，当前自车 FLU；速度是物体绝对运动在自车坐标轴上的分量 |
 | `box_labels` / `box_ids` | `[N]`，类别从 0 开始；动态重建需稳定 ID |
 | `occupancy` | 可选 `[X,Y,Z]`：-1 未知、0 确定自由、1..C 占据类别；网格 bounds/shape 必须匹配配置 |
+| `occupancy_binary` | 可选 `[X,Y,Z]`：-1 未知、0 观测自由、1 命中；只训练 binary 分支 |
+| `box_velocity_valid` | 可选 `[N]` bool；无法估计绝对速度的框屏蔽速度匹配和回归 |
 
-**Physical AI / Waymo：**本版本接收规范化后的数据，没有声称已经提供两者原生读取器。Physical AI 的相机径向 range 需要按单位相机射线转为 z-depth；不能使用自车原点距离替代相机 range。稀疏占据中未列出的体素不能自动标成 free。Waymo 的图像、内外参、位姿需转换并去畸变；原始 f-theta、rolling shutter 和逐相机异步运动补偿暂未接入。必须显式建立类别映射，设置 `sky_class`/`dynamic_classes`；`configs/stream4d/dvgt2.yaml` 的类别数量是可修改的实验默认值，不是已完成的数据集协议。
+**Physical AI / Waymo：**PAI 现有本地原始数据适配器，支持当前 mini 的 offline f-theta 与 Draco 格式，并使用明确的 12 类检测映射；Waymo 原始读取器尚未提供。Physical AI 的相机径向 range 需要按单位相机射线转为 z-depth；不能使用自车原点距离替代相机 range。稀疏占据中未列出的体素不能自动标成 free。PAI 去畸变采用中点时刻近似，没有 rolling shutter 逐行补偿或逐相机图像时间重投影。语义标签仍需显式映射并设置 `sky_class`/`dynamic_classes`；`configs/stream4d/dvgt2.yaml` 的默认类别数不代表 PAI 协议。
 
 重建训练额外需要 `world_from_ego`、`target_rgb`、`target_intrinsics`、`target_camera_to_world`，并在 JSON 行声明 `target_is_held_out: true`。目标 RGB 只参与 loss，不进入源图像主干。动态场景还需 `box_ids`、`target_boxes_world`、`target_box_ids`；源/目标标注使用同一个世界坐标系。`target_camera_indices` 指定目标图像对应哪个源相机的外观变换，默认按相同顺序。可选 `target_valid`、`target_range`、`target_non_sky`、`normals_ego`。
 
@@ -138,8 +140,8 @@ with torch.inference_mode():
 
 ## 当前边界
 
-- 新增头已有可训练实现、可微重建链路和合成测试，真实数据多任务权重尚未训练。
+- 检测、二值占据、Gaussian 和可选几何微调已通过 PAI 真实数据短训练；这不是收敛权重。图像语义、语义占据和 BEV 语义分类器仍缺监督，checkpoint 用 `trained_tasks` 标记实际训练任务。
 - 支持丰富的输出类型；不等同于 Foundation4D 论文架构、数据规模或评估成绩的完整复现。
-- 没有全局 PGO/回环、离线轨迹平滑、原生畸变相机和正式数据集 evaluator。
+- 没有全局 PGO/回环、离线轨迹平滑、模型内部的畸变相机投影和正式数据集 evaluator；PAI 在预处理时转换为 pinhole。
 - 严格在线跟踪与有界局部地图是本 baseline 的设计选择，需要独立评估精度、延迟与地图完整性。
 

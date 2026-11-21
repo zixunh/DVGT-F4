@@ -176,6 +176,7 @@ class StreamingFoundation4D(nn.Module):
             pretrained_geometry=self.backend.pretrained,
             new_heads_trained=bool(getattr(self, "trained_stages", [])),
             trained_stages=getattr(self, "trained_stages", []),
+            trained_tasks=getattr(self, "trained_tasks", []),
             **state.statistics(),
         )
         return result, state

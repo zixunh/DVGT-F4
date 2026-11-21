@@ -1,0 +1,26 @@
+# Low-resolution, six-camera PAI integration baseline. Not paper-scale training.
+backend:
+  name: dvgt2
+  repository: .
+  checkpoint: checkpoints/dvgt2.pt
+  window: 4
+  metric_scale: 0.1
+  amp: true
+  finetune_last_blocks: 0
+heads:
+  channels: 32
+  semantic_classes: 21
+  detection_classes: 12
+  detection_queries: 128
+  detection_bounds: [-40, -40, -4, 80, 40, 6]
+  occupancy_classes: 16
+  occupancy_shape: [60, 40, 8]
+  occupancy_coarse: [10, 8]
+  occupancy_bounds: [-40, -40, -3, 80, 40, 5]
+  sky_class: -1
+  dynamic_classes: []
+stream:
+  static_gaussians: 12000
+  actor_gaussians: 500
+  gaussian_per_frame: 2000
+renderer: gsplat
